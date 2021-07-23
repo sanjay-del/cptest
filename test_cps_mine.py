@@ -11,13 +11,14 @@ from iconsdk.signed_transaction import SignedTransaction
 from iconsdk.wallet.wallet import KeyWallet, Wallet
 from iconservice import icon_service_engine
 from iconservice.base.address import Address
-from tbears.config.tbears_config import tbears_server_config, TConfigKey as TbConf
+from tbears.config.tbears_config import TEST1_PRIVATE_KEY, tbears_server_config, TConfigKey as TbConf
 from tbears.libs.icon_integrate_test import Account
 from tbears.libs.icon_integrate_test import IconIntegrateTestBase, SCORE_INSTALL_ADDRESS
 from iconsdk.icon_service import IconService
 from iconsdk.providers.http_provider import HTTPProvider
 
-DIR_PATH = os.path.abspath(os.path.dirname(__file__))
+SCORES = os.path.abspath('')
+DEPLOY = ['cps_score', 'CPFTreasury', 'CPSTreasury']
 SCORE_ADDRESS = "scoreAddress"
 
 
@@ -25,7 +26,7 @@ def get_key(my_dict: dict, value: Union[str, int]):
     return list(my_dict.keys())[list(my_dict.values()).index(value)]
 
 
-class TestUtils(IconIntegrateTestBase):
+class BaseTestUtils(IconIntegrateTestBase):
 
     def setUp(self,
               genesis_accounts: List[Account] = None,
@@ -153,31 +154,69 @@ class TestUtils(IconIntegrateTestBase):
         print(f"-------------------The output is: : {response}")
         return response
     
-    class cps_test(TestUtils):
-        CPS_SCORE_PROJECT = os.path.abspath((os.path.join(DIR_PATH, '..', 'cps_score')))
-        CPF_TREASURY_PROJECT = os.path.abspath((os.path.join(DIR_PATH, '..', 'CPFTreasury')))
-        CPS_TREASURY_PROJECT = os.path.abspath((os.path.join(DIR_PATH, '..', 'CPSTreasury')))
-        BLOCK_INTERVAL = 6
-        contracts = ['cps_score', 'CPFTreasury', 'CPSTreasury']
-        def setUp(self):
-            self._wallet_setup()
-            super().setUp(genesis_accounts=self.genesis_accounts,
-                      block_confirm_interval=2,
-                      network_delay_ms=0,
-                      network_only=True,
-                      icon_service=IconService(HTTPProvider("http://127.0.0.1:9000", 3)),
-                      nid=3,
-                      tx_result_wait=4
-                      )
-            self.contracts = {}
-            self.PREPS = {
-            self._wallet_array[1].get_address(),
-            self._wallet_array[2].get_address(),
-            self._wallet_array[3].get_address(),
-            self._wallet_array[4].get_address(),
-            self._wallet_array[5].get_address(),
-            self._wallet_array[6].get_address(),
-            self._wallet_array[7].get_address()
-            }
-          
-            self._deploy_all()
+class TestCPS(BaseTestUtils):
+    # CPS_SCORE_PROJECT = os.path.abspath((os.path.join(DIR_PATH, '..', 'cps_score')))
+    # CPF_TREASURY_PROJECT = os.path.abspath((os.path.join(DIR_PATH, '..', 'CPFTreasury')))
+    # CPS_TREASURY_PROJECT = os.path.abspath((os.path.join(DIR_PATH, '..', 'CPSTreasury')))
+    BLOCK_INTERVAL = 6
+    
+    def setUp(self):
+        
+        self._wallet_setup()
+        super().setUp(genesis_accounts=self.genesis_accounts,
+                  block_confirm_interval=2,
+                  network_delay_ms=0,
+                  network_only=False,
+                  icon_service=None, #icon_service=IconService(HTTPProvider("http://127.0.0.1:9000", 3)),
+                  nid=3,
+                  tx_result_wait=4
+                  )
+        self.contracts = {}
+        self.PREPS = {
+        self._wallet_array[1].get_address(),
+        self._wallet_array[2].get_address(),
+        self._wallet_array[3].get_address(),
+        self._wallet_array[4].get_address(),
+        self._wallet_array[5].get_address(),
+        self._wallet_array[6].get_address(),
+        self._wallet_array[7].get_address()
+        }
+      
+        self._deploy_all()
+    
+    def _wallet_setup(self):
+        self.icx_factor = 10 ** 18
+        self.user1: 'KeyWallet' = self._wallet_array[9]
+        self.user2: 'KeyWallet' = self._wallet_array[10]
+        self.genesis_accounts = [
+        Account("user1", Address.from_string(self.user1.get_address()), 100_000_000 * self.icx_factor),
+        Account("user2", Address.from_string(self.user2.get_address()), 100_000_000 * self.icx_factor),
+    ]
+        
+    def _deploy_all(self):
+        txs =[]
+        params = {}
+        for address in DEPLOY:
+            # if address == 'CPFTreasury':
+            #     params = {'amount': 1_000_000 * 10 ** 18}
+            
+            self.SCORE_PROJECT = SCORES + "/" + address
+            print(self.SCORE_PROJECT)
+            print(f'Deploying {address}')
+            self.contracts[address] = self.deploy_tx(from_ = self._test1,
+                                                to = SCORE_INSTALL_ADDRESS,
+                                                value = 0,
+                                                 content=self.SCORE_PROJECT,
+                                                 params=params)['scoreAddress']
+    
+    def test_update(self):
+        for address in DEPLOY:
+            self.SCOREPROJECT = SCORES + '/' + address
+            tx_result= self.deploy_tx(
+                from_ = self._test1,
+                to = self.contracts[address],
+                content=self.SCOREPROJECT
+            )
+            print(f"Adress of {address} is {tx_result['scoreAddress']}")
+            self.assertEqual(self.contracts[address], tx_result['scoreAddress'])
+    
