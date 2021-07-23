@@ -154,6 +154,18 @@ class BaseTestUtils(IconIntegrateTestBase):
         print(f"-------------------The output is: : {response}")
         return response
     
+    # def call_tx(self, _score, params, method):
+    #     params = {} if params is None else params
+    #     _call = CallBuilder() \
+    #         .from_(self._test1.get_address()) \
+    #         .to(_score) \
+    #         .method(method) \
+    #         .params(params) \
+    #         .build()
+    #     response = self.process_call(_call, self.icon_service)
+    #     return response
+
+    
 class TestCPS(BaseTestUtils):
     # CPS_SCORE_PROJECT = os.path.abspath((os.path.join(DIR_PATH, '..', 'cps_score')))
     # CPF_TREASURY_PROJECT = os.path.abspath((os.path.join(DIR_PATH, '..', 'CPFTreasury')))
@@ -172,22 +184,22 @@ class TestCPS(BaseTestUtils):
                   tx_result_wait=4
                   )
         self.contracts = {}
-        self.PREPS = {
-        self._wallet_array[1].get_address(),
-        self._wallet_array[2].get_address(),
-        self._wallet_array[3].get_address(),
-        self._wallet_array[4].get_address(),
-        self._wallet_array[5].get_address(),
-        self._wallet_array[6].get_address(),
-        self._wallet_array[7].get_address()
-        }
+        # self.PREPS = {
+        # self._wallet_array[1].get_address(),
+        # self._wallet_array[2].get_address(),
+        # self._wallet_array[3].get_address(),
+        # self._wallet_array[4].get_address(),
+        # self._wallet_array[5].get_address(),
+        # self._wallet_array[6].get_address(),
+        # self._wallet_array[7].get_address()
+        # }
       
         self._deploy_all()
     
     def _wallet_setup(self):
         self.icx_factor = 10 ** 18
-        self.user1: 'KeyWallet' = self._wallet_array[9]
-        self.user2: 'KeyWallet' = self._wallet_array[10]
+        self.user1: 'KeyWallet' = self._wallet_array[5]
+        self.user2: 'KeyWallet' = self._wallet_array[6]
         self.genesis_accounts = [
         Account("user1", Address.from_string(self.user1.get_address()), 100_000_000 * self.icx_factor),
         Account("user2", Address.from_string(self.user2.get_address()), 100_000_000 * self.icx_factor),
@@ -220,3 +232,67 @@ class TestCPS(BaseTestUtils):
             print(f"Adress of {address} is {tx_result['scoreAddress']}")
             self.assertEqual(self.contracts[address], tx_result['scoreAddress'])
     
+    def _add_admin(self):
+        self.build_tx(self._test1, self.contracts['cps_score'], 0, 'add_admin', {'_address': self._test1.get_address()})
+
+    def _set_cps_treasury_score(self):
+        self._add_admin()
+        self.build_tx(self._test1, self.contracts['cps_score'], 0, 'set_cps_treasury_score',
+                               {'_score': self.contracts['CPSTreasury']})
+
+    def _set_cpf_treasury_score(self):
+        self._add_admin()
+        self.build_tx(self._test1, self.contracts['cps_score'], 0, 'set_cpf_treasury_score', {'_score':self.contracts['CPFTreasury']})
+        
+    def test_submit_proposal(self):
+        self._add_fund()
+        proposal_parameters = {'ipfs_hash': 'bafybeie5cifgwgu2x3guixgrs67miydug7ocyp6yia5kxv3imve6fthbs4',
+                               'project_title': 'Test Proposal',
+                               'project_duration': 3,
+                               'total_budget': 3182,
+                               'sponsor_address': self._wallet_array[10].get_address(),
+                               'ipfs_link': 'test.link@link.com'}
+        self._set_cps_treasury_score()
+        self._set_cpf_treasury_score()
+        print(self.call_tx(self.contracts['cps_score'], None, "get_period_status"))
+        self._set_initial_block()
+        self._register_prep()
+        print(self.call_tx(self.contracts['cps_score'], None, "get_period_status"))  # application period
+        tx_result = self.send_tx(self._test1, self.contracts['cps_score'], 50 * 10 ** 18, "submit_proposal",
+                                 {'_proposals': proposal_parameters})
+        print(tx_result)
+        print(self.call_tx(self.contracts['cps_score'], None, "get_period_status"))
+        self.assertEqual(tx_result['eventLogs'][0]['data'][0], 'Successfully submitted a Proposal.')
+
+    def _add_fund(self):
+            self.send_tx(self._test1, self.contracts['CPFTreasury'], 5000 * 10 ** 18, "add_fund", None)
+
+    def _set_initial_block(self):
+        self.send_tx(self._test1, self.contracts['cps_score'], 0, "set_initialBlock", None)
+    
+    def _register_prep(self):
+        print(f'Wallet address: {self._wallet_array[10].get_address()}')
+
+        print(self.send_tx(self._wallet_array[10], self.contracts['cps_score'], 0, 'register_prep', None))
+        print(self.send_tx(self._wallet_array[11], self.contracts['cps_score'], 0, 'register_prep', None))
+        print(self.send_tx(self._wallet_array[12], self.contracts['cps_score'], 0, 'register_prep', None))
+        print(self.send_tx(self._wallet_array[13], self.contracts['cps_score'], 0, 'register_prep', None))
+        print(self.send_tx(self._wallet_array[14], self.contracts['cps_score'], 0, 'register_prep', None))
+        print(self.send_tx(self._wallet_array[15], self.contracts['cps_score'], 0, 'register_prep', None))
+        print(self.send_tx(self._wallet_array[16], self.contracts['cps_score'], 0, 'register_prep', None))
+        
+    def _submit_proposal(self):
+        self._add_fund()
+        proposal_parameters = {'ipfs_hash': 'bafybeie5cifgwgu2x3guixgrs67miydug7ocyp6yia5kxv3imve6fthbs4',
+                               'project_title': 'Test Proposal',
+                               'project_duration': 3,
+                               'total_budget': 3182,
+                               'sponsor_address': self._wallet_array[10].get_address(),
+                               'ipfs_link': 'test.link@link.com'}
+        self._set_cps_treasury_score()
+        self._set_cpf_treasury_score()
+        self._set_initial_block()
+        self._register_prep()
+        tx_result = self.send_tx(self._test1, self.contracts['cps_score'], 50 * 10 ** 18, "submit_proposal",
+                                 {'_proposals': proposal_parameters})
+        print(tx_result)
